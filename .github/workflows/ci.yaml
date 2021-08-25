@@ -1,0 +1,63 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+
+  deploy:
+    name: Deploy to GitHub and Rubygems.org
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.repository_owner == 'ladybug-tools'
+    steps:
+      - uses: actions/checkout@v2
+      - name: set up node  # we need node for for semantic release
+        uses: actions/setup-node@v2.1.2
+        with:
+          node-version: 14.2.0
+      - name: install semantic-release
+        run:
+          npm install @semantic-release/exec
+      - name: run semantic release
+        uses: cycjimmy/semantic-release-action@v2
+        id: semantic   # Need an `id` for output variables
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update gemspec
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.semantic.outputs.new_release_version }}
+        run: |
+          export CLEAN_TAG=$(echo $RELEASE_TAG | sed 's/v//g')
+          sed -i 's/"0.0.0"/'"'$CLEAN_TAG'"'/g' lbt-measures.gemspec
+      - name: Release Gem
+        if: steps.semantic.outputs.new_release_published == 'true'
+        uses: dawidd6/action-publish-gem@v1
+        with:
+          api_key: ${{secrets.RUBYGEMS_API_KEY}}
+      - name: Update lbt-grasshopper
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.semantic.outputs.new_release_version }}
+          DISPATCH_REPO: ladybug-tools/lbt-grasshopper
+          DEPS_TOKEN: ${{ secrets.DEPS_UPDATING }}
+        run: |
+          curl -X POST https://api.github.com/repos/$DISPATCH_REPO/dispatches \
+          -H "Accept: application/vnd.github.everest-preview+json" \
+          -d '{
+            "event_type": "lbt_measures_gem_release",
+            "client_payload": {
+              "version" : "'$RELEASE_TAG'"
+            }
+          }' \
+          -u ladybugbot:$DEPS_TOKEN
+      - name: Update honeybee-energy
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.semantic.outputs.new_release_version }}
+          DISPATCH_REPO: ladybug-tools/honeybee-energy
+          DEPS_TOKEN: ${{ secrets.DEPS_UPDATING }}
+        run: |
+          curl -X POST https://api.github.com/repos/$DISPATCH_REPO/dispatches \
+          -H "Accept: application/vnd.github.everest-preview+json" \
+          -d '{"event_type": "lbt_measures_gem_release", "client_payload": {"version": "'$RELEASE_TAG'"}}' \
+          -u ladybugbot:$DEPS_TOKEN

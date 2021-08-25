@@ -1,0 +1,34 @@
+/.bundle/
+/.yardoc
+/.ruby-version
+/Gemfile.lock
+/gems
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/coverage/
+/spec/output/
+/spec/reports/
+/spec/test/
+/tmp/
+/test/
+/lib/measures/test_results
+/lib/measures/.rubocop*
+/.vscode
+/.vs
+
+# rspec failure tracking
+.rspec_status
+.rakeTasks
+
+# Ignore IDE files
+/.idea
+*.rubocop-http*
+
+# measures tests
+lib/measures/.rubocop.yml
+lib/measures/test_results/*
+lib/measures/*/tests/output
+
+out.txt
