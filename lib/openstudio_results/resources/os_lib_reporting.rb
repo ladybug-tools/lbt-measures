@@ -36,6 +36,8 @@
 require 'json'
 require 'openstudio-standards'
 
+$name_map = {}
+
 module OsLib_Reporting
   # setup - get model, sql, and setup web assets path
   def self.setup(runner)
@@ -48,6 +50,21 @@ module OsLib_Reporting
       return false
     end
     model = model.get
+
+    # create a map between zone ids and display names
+    if $name_map.empty?
+      unless model.nil? 
+        $name_map = {}
+        model.getThermalZones.sort.each do |zone|
+          z_name = zone.name.get.to_s
+          z_d_name = z_name
+          unless zone.displayName.empty?
+            z_d_name = zone.displayName.get.to_s
+          end
+          $name_map[z_name.upcase] = z_d_name
+        end
+      end
+    end
 
     # get the last idf
     workspace = runner.lastEnergyPlusWorkspace
@@ -489,7 +506,11 @@ module OsLib_Reporting
       end
 
       # data for space type breakdown
-      display = spaceType.name.get
+      unless spaceType.displayName.empty?
+        display = spaceType.displayName.get
+      else
+        display = spaceType.name.get
+      end
       floor_area_si = spaceType.floorArea
       floor_area_si = 0
       # loop through spaces so I can skip if not included in floor area
@@ -1590,7 +1611,11 @@ module OsLib_Reporting
     model.getThermalZones.sort.each do |zone|
       # plant loop data output
       output_data_zone_equipment = {}
-      output_data_zone_equipment[:title] = zone.name.get # TODO: - confirm that zone has a name
+      z_name = zone.name.get.to_s
+      unless zone.displayName.empty?
+        z_name = zone.displayName.get.to_s
+      end
+      output_data_zone_equipment[:title] = z_name # TODO: - confirm that zone has a name
       output_data_zone_equipment[:header] = ['Object', 'Description', 'Value', 'Sizing', 'Count']
       output_data_zone_equipment[:units] = [] # not using units for these tables
       output_data_zone_equipment[:data] = []
@@ -2018,7 +2043,11 @@ module OsLib_Reporting
       units = 'W'
       count = instance.multiplier
 
-      @elevator_data[:data] << [instance.name.to_s, elec_equip_def.name, elev_zone.name.get, elev_power_neat, units, OpenStudio.toNeatString(count, 2, true)]
+      z_name = elev_zone.name.get.to_s
+      unless elev_zone.displayName.empty?
+        z_name = elev_zone.displayName.get.to_s
+      end
+      @elevator_data[:data] << [instance.name.to_s, elec_equip_def.name, z_name, elev_power_neat, units, OpenStudio.toNeatString(count, 2, true)]
       runner.registerValue(OsLib_Reporting.reg_val_string_prep(instance.name.to_s), elev_power, units)
     end
 
@@ -2090,9 +2119,18 @@ module OsLib_Reporting
       space_name_list = []
       spaceType.spaces.each do |space|
         # grabspace and zone names
-        space_name_list << space.name.to_s
+        unless space.displayName.empty?
+          space_name_list << space.displayName.get.to_s
+        else
+          space_name_list << space.name.to_s
+        end
         if space.thermalZone.is_initialized
-          zone_name_list << space.thermalZone.get.name.to_s
+          t_zone = space.thermalZone.get
+          unless t_zone.displayName.empty?
+            zone_name_list << t_zone.displayName.get.to_s
+          else
+            zone_name_list << t_zone.name.to_s
+          end
         end
       end
       # output_data_space_type_details[:data] << [space_name_list.uniq.join(","),space_name_list.uniq.size,"Spaces",""]
@@ -2998,7 +3036,7 @@ module OsLib_Reporting
         end
 
         # add rows to table
-        row_data = [key, unmet_htg.round, unmet_htg_occ.round]
+        row_data = [$name_map[key.to_s], unmet_htg.round, unmet_htg_occ.round]
         row_color = ['', '', '']
         temperature_bins.each do |k, v|
           row_data << v
@@ -3118,7 +3156,7 @@ module OsLib_Reporting
         mean = humidity_sum / humidity_counter.to_f
 
         # add rows to table
-        row_data = [key]
+        row_data = [$name_map[key.to_s]]
         row_color = ['']
         humidity_bins.each do |k, v|
           row_data << v
@@ -3252,8 +3290,12 @@ module OsLib_Reporting
 
       area = OpenStudio.convert(space.floorArea, source_units_area, target_units_area).get
       lp = OpenStudio.convert(space.lightingPowerPerFloorArea, source_units_lpd, target_units_lpd).get
+      sp_name = space.name.to_s
+      unless space.displayName.empty?
+        sp_name = space.displayName.get.to_s
+      end
 
-      space_lighting_table[:data] << [{ sub_header: "Space Name: '#{space.name}', Area: #{area.round(0)} #{target_units_area},
+      space_lighting_table[:data] << [{ sub_header: "Space Name: '#{sp_name}', Area: #{area.round(0)} #{target_units_area},
                                         Total LPD: #{lp.round(2)} #{target_units_lpd}" }, '', '', '', '', '']
 
       lights_found = 0
@@ -3346,14 +3388,23 @@ module OsLib_Reporting
       zone_control = 'n/a'
 
       space.daylightingControls.each do |dc|
+        z_name = thermal_zone.name.get.to_s
+        unless thermal_zone.displayName.empty?
+          z_name = thermal_zone.displayName.get.to_s
+        end
+
         if thermal_zone.primaryDaylightingControl.is_initialized && dc.isPrimaryDaylightingControl
-          zone_control = "#{thermal_zone.name} (primary, #{thermal_zone.fractionofZoneControlledbyPrimaryDaylightingControl.round(1)})"
+          zone_control = "#{z_name} (primary, #{thermal_zone.fractionofZoneControlledbyPrimaryDaylightingControl.round(1)})"
         end
         if thermal_zone.secondaryDaylightingControl.is_initialized && dc.isSecondaryDaylightingControl
-          zone_control = "#{thermal_zone.name} (secondary, #{thermal_zone.fractionofZoneControlledbySecondaryDaylightingControl.round(1)})"
+          zone_control = "#{z_name} (secondary, #{thermal_zone.fractionofZoneControlledbySecondaryDaylightingControl.round(1)})"
         end
         illuminance_conv = OpenStudio.convert(dc.illuminanceSetpoint, source_units_illuminance, target_units_illuminance).get
-        lighting_controls_table[:data] << [space.name, dc.name, zone_control, illuminance_conv.round(0)]
+        sp_name = space.name.to_s
+        unless space.displayName.empty?
+          sp_name = space.displayName.get.to_s
+        end
+        lighting_controls_table[:data] << [sp_name, dc.name, zone_control, illuminance_conv.round(0)]
       end
     end
 
@@ -3438,13 +3489,17 @@ module OsLib_Reporting
       space_elec_equip['space'] = space.electricEquipment
 
       # space subheading if any equipment found
+      sp_name = space.name.to_s
+      unless space.displayName.empty?
+        sp_name = space.displayName.get.to_s
+      end
 
       if is_ip_units
         area = space.floorArea * 10.7639
-        table[:data] << [{ sub_header: "Space Name: #{space.name}, Area: #{area.round(0)} ft^2" }, '', '', '', '', ''] if !space_elec_equip['spacetype'].empty? || !space_elec_equip['space'].empty?
+        table[:data] << [{ sub_header: "Space Name: #{sp_name}, Area: #{area.round(0)} ft^2" }, '', '', '', '', ''] if !space_elec_equip['spacetype'].empty? || !space_elec_equip['space'].empty?
       else
         area = space.floorArea
-        table[:data] << [{ sub_header: "Space Name: #{space.name}, Area: #{area.round(0)} m^2" }, '', '', '', '', ''] if !space_elec_equip['spacetype'].empty? || !space_elec_equip['space'].empty?
+        table[:data] << [{ sub_header: "Space Name: #{sp_name}, Area: #{area.round(0)} m^2" }, '', '', '', '', ''] if !space_elec_equip['spacetype'].empty? || !space_elec_equip['space'].empty?
       end
 
       # spacetype equipment
@@ -3506,10 +3561,16 @@ module OsLib_Reporting
       else
         area = space.floorArea.to_f
       end
+
+      sp_name = space.name.to_s
+      unless space.displayName.empty?
+        sp_name = space.displayName.get.to_s
+      end
+
       if is_ip_units
-        table[:data] << [{ sub_header: "Space Name: #{space.name}, Area: #{area.round(0)} ft^2" }, '', '', '', '', ''] if !space_gas_equip['spacetype'].empty? || !space_gas_equip['space'].empty?
+        table[:data] << [{ sub_header: "Space Name: #{sp_name}, Area: #{area.round(0)} ft^2" }, '', '', '', '', ''] if !space_gas_equip['spacetype'].empty? || !space_gas_equip['space'].empty?
       else
-        table[:data] << [{ sub_header: "Space Name: #{space.name}, Area: #{area.round(0)} m^2" }, '', '', '', '', ''] if !space_gas_equip['spacetype'].empty? || !space_gas_equip['space'].empty?
+        table[:data] << [{ sub_header: "Space Name: #{sp_name}, Area: #{area.round(0)} m^2" }, '', '', '', '', ''] if !space_gas_equip['spacetype'].empty? || !space_gas_equip['space'].empty?
       end
 
       # spacetype equipment
@@ -3884,7 +3945,12 @@ module OsLib_Reporting
 
     # run query and populate zone_summary_table
     rows.each do |row|
-      row_data = [row]
+      row_data = []
+      unless $name_map[row.to_s].nil?
+        row_data << $name_map[row.to_s]
+      else
+        row_data << row
+      end
       column_counter = -1
       zone_summary_table[:header].each do |header|
         column_counter += 1
@@ -3959,7 +4025,7 @@ module OsLib_Reporting
     # run query and populate zone_dd_table
     rows.each do |row|
       # populate cooling row
-      row_data = [row, 'Cooling']
+      row_data = [$name_map[row.to_s], 'Cooling']
       column_counter = -1
       columns_query.each do |header|
         column_counter += 1
@@ -3981,7 +4047,7 @@ module OsLib_Reporting
       zone_dd_table[:data] << row_data
 
       # populate heating row
-      row_data = [row, 'Heating']
+      row_data = [$name_map[row.to_s], 'Heating']
       column_counter = -1
       columns_query.each do |header|
         column_counter += 1
@@ -4110,7 +4176,7 @@ module OsLib_Reporting
 
     # run query and populate table
     rows.each do |row|
-      row_data = [row]
+      row_data = [$name_map[row.to_s]]
       column_counter = -1
       table[:header].each do |header|
         column_counter += 1
