@@ -58,8 +58,10 @@ module OsLib_Reporting
         model.getThermalZones.sort.each do |zone|
           z_name = zone.name.get.to_s
           z_d_name = z_name
-          unless zone.displayName.empty?
-            z_d_name = zone.displayName.get.to_s
+          if zone.respond_to?(:displayName)
+            unless zone.displayName.empty?
+              z_d_name = zone.displayName.get.to_s
+            end
           end
           $name_map[z_name.upcase] = z_d_name
         end
@@ -506,10 +508,11 @@ module OsLib_Reporting
       end
 
       # data for space type breakdown
-      unless spaceType.displayName.empty?
-        display = spaceType.displayName.get
-      else
-        display = spaceType.name.get
+      display = spaceType.name.get
+      if spaceType.respond_to?(:displayName)
+        unless spaceType.displayName.empty?
+          display = spaceType.displayName.get
+        end
       end
       floor_area_si = spaceType.floorArea
       floor_area_si = 0
@@ -1612,8 +1615,10 @@ module OsLib_Reporting
       # plant loop data output
       output_data_zone_equipment = {}
       z_name = zone.name.get.to_s
-      unless zone.displayName.empty?
-        z_name = zone.displayName.get.to_s
+      if zone.respond_to?(:displayName)
+        unless zone.displayName.empty?
+          z_name = zone.displayName.get.to_s
+        end
       end
       output_data_zone_equipment[:title] = z_name # TODO: - confirm that zone has a name
       output_data_zone_equipment[:header] = ['Object', 'Description', 'Value', 'Sizing', 'Count']
@@ -2044,8 +2049,10 @@ module OsLib_Reporting
       count = instance.multiplier
 
       z_name = elev_zone.name.get.to_s
-      unless elev_zone.displayName.empty?
-        z_name = elev_zone.displayName.get.to_s
+      if elev_zone.respond_to?(:displayName)
+        unless elev_zone.displayName.empty?
+          z_name = elev_zone.displayName.get.to_s
+        end
       end
       @elevator_data[:data] << [instance.name.to_s, elec_equip_def.name, z_name, elev_power_neat, units, OpenStudio.toNeatString(count, 2, true)]
       runner.registerValue(OsLib_Reporting.reg_val_string_prep(instance.name.to_s), elev_power, units)
@@ -2118,16 +2125,24 @@ module OsLib_Reporting
       zone_name_list = []
       space_name_list = []
       spaceType.spaces.each do |space|
-        # grabspace and zone names
-        unless space.displayName.empty?
-          space_name_list << space.displayName.get.to_s
+        # grab space and zone names
+        if space.respond_to?(:displayName)
+          unless space.displayName.empty?
+            space_name_list << space.displayName.get.to_s
+          else
+            space_name_list << space.name.to_s
+          end
         else
           space_name_list << space.name.to_s
         end
         if space.thermalZone.is_initialized
           t_zone = space.thermalZone.get
-          unless t_zone.displayName.empty?
-            zone_name_list << t_zone.displayName.get.to_s
+          if t_zone.respond_to?(:displayName)
+            unless t_zone.displayName.empty?
+              zone_name_list << t_zone.displayName.get.to_s
+            else
+              zone_name_list << t_zone.name.to_s
+            end
           else
             zone_name_list << t_zone.name.to_s
           end
@@ -3291,8 +3306,10 @@ module OsLib_Reporting
       area = OpenStudio.convert(space.floorArea, source_units_area, target_units_area).get
       lp = OpenStudio.convert(space.lightingPowerPerFloorArea, source_units_lpd, target_units_lpd).get
       sp_name = space.name.to_s
-      unless space.displayName.empty?
-        sp_name = space.displayName.get.to_s
+      if space.respond_to?(:displayName)
+        unless space.displayName.empty?
+          sp_name = space.displayName.get.to_s
+        end
       end
 
       space_lighting_table[:data] << [{ sub_header: "Space Name: '#{sp_name}', Area: #{area.round(0)} #{target_units_area},
@@ -3389,8 +3406,10 @@ module OsLib_Reporting
 
       space.daylightingControls.each do |dc|
         z_name = thermal_zone.name.get.to_s
-        unless thermal_zone.displayName.empty?
-          z_name = thermal_zone.displayName.get.to_s
+        if thermal_zone.respond_to?(:displayName)
+          unless thermal_zone.displayName.empty?
+            z_name = thermal_zone.displayName.get.to_s
+          end
         end
 
         if thermal_zone.primaryDaylightingControl.is_initialized && dc.isPrimaryDaylightingControl
@@ -3401,8 +3420,10 @@ module OsLib_Reporting
         end
         illuminance_conv = OpenStudio.convert(dc.illuminanceSetpoint, source_units_illuminance, target_units_illuminance).get
         sp_name = space.name.to_s
-        unless space.displayName.empty?
-          sp_name = space.displayName.get.to_s
+        if space.respond_to?(:displayName)
+          unless space.displayName.empty?
+            sp_name = space.displayName.get.to_s
+          end
         end
         lighting_controls_table[:data] << [sp_name, dc.name, zone_control, illuminance_conv.round(0)]
       end
@@ -3490,8 +3511,10 @@ module OsLib_Reporting
 
       # space subheading if any equipment found
       sp_name = space.name.to_s
-      unless space.displayName.empty?
-        sp_name = space.displayName.get.to_s
+      if space.respond_to?(:displayName)
+        unless space.displayName.empty?
+          sp_name = space.displayName.get.to_s
+        end
       end
 
       if is_ip_units
@@ -3563,8 +3586,10 @@ module OsLib_Reporting
       end
 
       sp_name = space.name.to_s
-      unless space.displayName.empty?
-        sp_name = space.displayName.get.to_s
+      if space.respond_to?(:displayName)
+        unless space.displayName.empty?
+          sp_name = space.displayName.get.to_s
+        end
       end
 
       if is_ip_units
