@@ -2101,7 +2101,7 @@ module OsLib_Reporting
       target_units_FlowRate = 'm^3/h'
       def_units_powerPerFloorArea = 'W/m^2'
       inst_units_FlowRate = 'm^3/h'
-      target_units_flowperSpaceFloorArea = 'm/s'
+      target_units_flowperSpaceFloorArea = 'm/h'
       inst_units_outdoorAirFlowperPerson = 'm^3/h/person'
       inst_units_flowperSpaceFloorArea = 'm^3/h/ floor area m^2'
       inst_units_flowperExteriorSurfaceArea = 'm^3/h/ext surf area m^2'
