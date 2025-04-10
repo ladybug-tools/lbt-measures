@@ -41,7 +41,7 @@ require 'date'
 require_relative 'resources/va3c'
 
 # start the measure
-class ViewData < OpenStudio::Ruleset::ReportingUserScript
+class ViewData < OpenStudio::Measure::ReportingUserScript
   # define the name that a user will see
   def name
     return 'ViewData'
@@ -83,12 +83,12 @@ class ViewData < OpenStudio::Ruleset::ReportingUserScript
 
   # define the arguments that the user will input
   def arguments(model = nil)
-    args = OpenStudio::Ruleset::OSArgumentVector.new
+    args = OpenStudio::Measure::OSArgumentVector.new
 
     chs = OpenStudio::StringVector.new
     chs << 'Last OSM'
     chs << 'Last IDF'
-    file_source = OpenStudio::Ruleset::OSArgument.makeChoiceArgument('file_source', chs, true)
+    file_source = OpenStudio::Measure::OSArgument.makeChoiceArgument('file_source', chs, true)
     file_source.setDisplayName('Model Source')
     file_source.setDefaultValue('Last OSM')
     args << file_source
@@ -96,22 +96,22 @@ class ViewData < OpenStudio::Ruleset::ReportingUserScript
     chs = OpenStudio::StringVector.new
     chs << 'Timestep'
     chs << 'Hourly'
-    reporting_frequency = OpenStudio::Ruleset::OSArgument.makeChoiceArgument('reporting_frequency', chs, true)
+    reporting_frequency = OpenStudio::Measure::OSArgument.makeChoiceArgument('reporting_frequency', chs, true)
     reporting_frequency.setDisplayName('Reporting Frequency')
     reporting_frequency.setDefaultValue('Hourly')
     args << reporting_frequency
 
-    variable1_name = OpenStudio::Ruleset::OSArgument.makeStringArgument('variable1_name', true)
+    variable1_name = OpenStudio::Measure::OSArgument.makeStringArgument('variable1_name', true)
     variable1_name.setDisplayName('Variable 1 Name')
     variable1_name.setDefaultValue('Surface Outside Face Temperature')
     args << variable1_name
 
-    variable2_name = OpenStudio::Ruleset::OSArgument.makeStringArgument('variable2_name', true)
+    variable2_name = OpenStudio::Measure::OSArgument.makeStringArgument('variable2_name', true)
     variable2_name.setDisplayName('Variable 2 Name')
     variable2_name.setDefaultValue('Surface Inside Face Temperature')
     args << variable2_name
 
-    variable3_name = OpenStudio::Ruleset::OSArgument.makeStringArgument('variable3_name', true)
+    variable3_name = OpenStudio::Measure::OSArgument.makeStringArgument('variable3_name', true)
     variable3_name.setDisplayName('Variable 3 Name')
     variable3_name.setDefaultValue('Zone Mean Radiant Temperature')
     args << variable3_name
