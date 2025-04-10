@@ -45,12 +45,23 @@
 # see the URL below for access to C++ documentation on workspace objects (click on "workspace" in the main window to view workspace objects)
 # http://openstudio.nrel.gov/sites/openstudio.nrel.gov/files/nv_data/cpp_documentation_it/utilities/html/idf_page.html
 
+require 'openstudio-standards'
+
 # start the measure
-class InjectIDFObjects < OpenStudio::Measure::EnergyPlusMeasure
-  # define the name that a user will see, this method may be deprecated as
-  # the display name in PAT comes from the name field in measure.xml
+class ApplyEfficiencyStandard < OpenStudio::Measure::ModelMeasure
+  # human readable name
   def name
-    return ' Inject IDF Objects'
+    return ' Apply Efficiency Standard'
+  end
+
+  # human readable description
+  def description
+    return 'Apply an efficiency standard to HVAC equipment using openStudio-standards.'
+  end
+
+  # human readable description of modeling approach
+  def modeler_description
+    return 'Apply an efficiency standard to HVAC equipment using openStudio-standards.'
   end
 
   # define the arguments that the user will input
@@ -58,50 +69,74 @@ class InjectIDFObjects < OpenStudio::Measure::EnergyPlusMeasure
     args = OpenStudio::Measure::OSArgumentVector.new
 
     # make an argument for external idf
-    source_idf_path = OpenStudio::Measure::OSArgument.makeStringArgument('source_idf_path', true)
-    source_idf_path.setDisplayName('External IDF File Name')
-    source_idf_path.setDescription('Name of the IDF file to inject objects from. This is the filename with the extension (e.g. MyModel.idf). Optionally this can inclucde the full file path, but for most use cases should just be file name.')
-    args << source_idf_path
+    standard = OpenStudio::Measure::OSArgument.makeStringArgument('standard', true)
+    standard.setDisplayName('Standard to Apply')
+    standard.setDescription('Text for the standard to be applied to the HVAC equipment. Choose from the following. DOE_Ref_Pre_1980, DOE_Ref_1980_2004, ASHRAE_2004, ASHRAE_2007, ASHRAE_2010, ASHRAE_2013, ASHRAE_2016, ASHRAE_2019')
+    args << standard
 
     return args
   end
 
   # define what happens when the measure is run
-  def run(workspace, runner, user_arguments)
-    super(workspace, runner, user_arguments)
-
-    # use the built-in error checking
-    if !runner.validateUserArguments(arguments(workspace), user_arguments)
+  def run(model, runner, user_arguments)
+    super(model, runner, user_arguments)
+    STDOUT.flush
+    if !runner.validateUserArguments(arguments(model), user_arguments)
       return false
     end
 
-    # assign the user inputs to variables
-    source_idf_path = runner.getStringArgumentValue('source_idf_path', user_arguments)
+    # get the standard to apply
+    standard_str = runner.getStringArgumentValue('standard', user_arguments)
+    standard_mapper = {
+      DOE_Ref_Pre_1980: 'DOE Ref Pre-1980',
+      DOE_Ref_1980_2004: 'DOE Ref 1980-2004',
+      ASHRAE_2004: '90.1-2004',
+      ASHRAE_2007: '90.1-2007',
+      ASHRAE_2010: '90.1-2010',
+      ASHRAE_2013: '90.1-2013',
+      ASHRAE_2016: '90.1-2016',
+      ASHRAE_2019: '90.1-2019'
+    }
+    std_gem_standard = standard_mapper[standard_str.to_sym]
+    # std_gem_standard = '90.1-2019'
+    building = model.getBuilding
+    building.setStandardsTemplate(std_gem_standard)
+    standard_id = building.standardsTemplate.get
+    standard = Standard.build(standard_id)
 
-    # report initial condition
-    runner.registerInitialCondition("The initial IDF file had #{workspace.objects.size} objects.")
-
-    # find source_idf_path
-    osw_file = runner.workflow.findFile(source_idf_path)
-    if osw_file.is_initialized
-      source_idf_path = osw_file.get.to_s
-    else
-      runner.registerError("Did not find #{source_idf_path} in paths described in OSW file.")
+    # Set the heating and cooling sizing parameters
+    puts 'Autosizing HVAC systems and assigning efficiencies'
+    standard.model_apply_prm_sizing_parameters(model)
+    # Perform a sizing run
+    if standard.model_run_sizing_run(model, "#{Dir.pwd}/SR1") == false
+      log_messages_to_runner(runner, debug = true)
       return false
     end
-
-    # load IDF
-    source_idf = OpenStudio::IdfFile.load(OpenStudio::Path.new(source_idf_path)).get
-
-    # add everything from the file
-    workspace.addObjects(source_idf.objects)
-
-    # report final condition
-    runner.registerFinalCondition("The final IDF file had #{workspace.objects.size} objects.")
+    puts 'Done with autosizing HVAC systems!'
+    # If there are any multizone systems, reset damper positions
+    # to achieve a 60% ventilation effectiveness minimum for the system
+    # following the ventilation rate procedure from 62.1
+    standard.model_apply_multizone_vav_outdoor_air_sizing(model)
+    # get the climate zone  
+    climate_zone_obj = model.getClimateZones.getClimateZone('ASHRAE', 2006)
+    if climate_zone_obj.empty
+      climate_zone_obj = model.getClimateZones.getClimateZone('ASHRAE', 2013)
+    end
+    climate_zone = climate_zone_obj.value
+    # get the building type
+    bldg_type = nil
+    unless building.standardsBuildingType.empty?
+      bldg_type = building.standardsBuildingType.get
+    end
+    # Apply the prototype HVAC assumptions
+    standard.model_apply_prototype_hvac_assumptions(model, bldg_type, climate_zone)
+    # Apply the HVAC efficiency standard
+    standard.model_apply_hvac_efficiency_standard(model, climate_zone)
+    puts 'Done with applying efficiencies!'
 
     return true
   end
 end
 
 # this allows the measure to be use by the application
-InjectIDFObjects.new.registerWithApplication
+ApplyEfficiencyStandard.new.registerWithApplication
