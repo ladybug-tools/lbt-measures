@@ -1,36 +1,6 @@
 # *******************************************************************************
-# OpenStudio(R), Copyright (c) 2008-2021, Alliance for Sustainable Energy, LLC.
-# All rights reserved.
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-# (1) Redistributions of source code must retain the above copyright notice,
-# this list of conditions and the following disclaimer.
-#
-# (2) Redistributions in binary form must reproduce the above copyright notice,
-# this list of conditions and the following disclaimer in the documentation
-# and/or other materials provided with the distribution.
-#
-# (3) Neither the name of the copyright holder nor the names of any contributors
-# may be used to endorse or promote products derived from this software without
-# specific prior written permission from the respective party.
-#
-# (4) Other than as required in clauses (1) and (2), distributions in any form
-# of modifications or other derivative works may not use the "OpenStudio"
-# trademark, "OS", "os", or any other confusingly similar designation without
-# specific prior written permission from Alliance for Sustainable Energy, LLC.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER(S) AND ANY CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-# THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER(S), ANY CONTRIBUTORS, THE
-# UNITED STATES GOVERNMENT, OR THE UNITED STATES DEPARTMENT OF ENERGY, NOR ANY OF
-# THEIR EMPLOYEES, BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
-# OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
-# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# OpenStudio(R), Copyright (c) Alliance for Sustainable Energy, LLC.
+# See also https://openstudio.net/license
 # *******************************************************************************
 
 require 'json'
@@ -773,7 +743,6 @@ module OsLib_Reporting
         target_units = source_units
       end
 
-      target_units = 'kBtu'
       value = OpenStudio.convert(results.get, 'GJ', target_units).get
       value_neat = OpenStudio.toNeatString(value, 0, true)
       output_data_energy_use[:data] << [fuel_type, value_neat]
@@ -979,6 +948,8 @@ module OsLib_Reporting
         display_units = '%'
         perf_val *= 100
         perf_val = OpenStudio.toNeatString(perf_val, 1, true)
+      elsif perf_name.downcase.include?('cop')
+        perf_val = OpenStudio.toNeatString(perf_val, 2, true)
       end
       # Report the value
       data_arrays << ['', perf_name, "#{perf_val} #{display_units}", '', '']
@@ -1036,7 +1007,7 @@ module OsLib_Reporting
       # Constrol type and temperature range
       setpoint = component.to_SetpointManagerScheduled.get
       supply_air_temp_schedule = setpoint.schedule
-      schedule_values = OsLib_Schedules.getMinMaxAnnualProfileValue(component.model, supply_air_temp_schedule)
+      schedule_values = OpenstudioStandards::Schedules.schedule_get_min_max(supply_air_temp_schedule)
       if schedule_values.nil?
         schedule_values_pretty = "can't inspect schedule"
         target_units = ''
@@ -1284,14 +1255,14 @@ module OsLib_Reporting
           if thermal_zone.thermostatSetpointDualSetpoint.is_initialized
             thermostat = thermal_zone.thermostatSetpointDualSetpoint.get
             if thermostat.coolingSetpointTemperatureSchedule.is_initialized
-              schedule_values = OsLib_Schedules.getMinMaxAnnualProfileValue(model, thermostat.coolingSetpointTemperatureSchedule.get)
+              schedule_values = OpenstudioStandards::Schedules.schedule_get_min_max(thermostat.coolingSetpointTemperatureSchedule.get)
               unless schedule_values.nil?
                 cooling_temp_ranges << schedule_values['min']
                 cooling_temp_ranges << schedule_values['max']
               end
             end
             if thermostat.heatingSetpointTemperatureSchedule.is_initialized
-              schedule_values = OsLib_Schedules.getMinMaxAnnualProfileValue(model, thermostat.heatingSetpointTemperatureSchedule.get)
+              schedule_values = OpenstudioStandards::Schedules.schedule_get_min_max(thermostat.heatingSetpointTemperatureSchedule.get)
               unless schedule_values.nil?
                 heating_temps_ranges << schedule_values['min']
                 heating_temps_ranges << schedule_values['max']
@@ -1777,19 +1748,20 @@ module OsLib_Reporting
           if use_old_gem_code
             shgc = construction_root.calculated_solar_heat_gain_coefficient
           else
-            shgc = std.construction_calculated_solar_heat_gain_coefficient(construction_root)
+            shgc = OpenstudioStandards::Constructions.construction_get_solar_transmittance(construction_root)
           end
           shgc_neat = OpenStudio.toNeatString(shgc, n_decimals_rvalue, false)
           if use_old_gem_code
             vlt = construction_root.calculated_visible_transmittance
           else
-            vlt = std.construction_calculated_visible_transmittance(construction_root)
+            vlt = OpenstudioStandards::Constructions.construction_get_visible_transmittance(construction_root) 
           end
           vlt_neat = OpenStudio.toNeatString(vlt, n_decimals_rvalue, false)
           if use_old_gem_code
             u_factor = construction_root.calculated_u_factor
           else
-            u_factor = std.construction_calculated_u_factor(construction_root)
+            surface_construction = construction_root.to_LayeredConstruction.get
+            u_factor = OpenstudioStandards::Constructions.construction_get_conductance(surface_construction)
           end
           ufactor_conv = OpenStudio.convert(u_factor, source_ufactor_units, target_ufactor_units).get
           ufactor_neat = OpenStudio.toNeatString(ufactor_conv, n_decimals_rvalue, false)
@@ -1930,7 +1902,7 @@ module OsLib_Reporting
       peak_flow_rate_neat = OpenStudio.toNeatString(peak_flow_rate_conv, n_decimals, true)
       if water_use_equipment_def.targetTemperatureSchedule.is_initialized
         target_temp_sch = water_use_equipment_def.targetTemperatureSchedule.get
-        schedule_values = OsLib_Schedules.getMinMaxAnnualProfileValue(model, target_temp_sch)
+        schedule_values = OpenstudioStandards::Schedules.schedule_get_min_max(target_temp_sch)
         if !schedule_values.nil?
           min_conv = OpenStudio.convert(schedule_values['min'], source_units_temp, target_units_temp).get
           max_conv = OpenStudio.convert(schedule_values['max'], source_units_temp, target_units_temp).get
@@ -2101,7 +2073,7 @@ module OsLib_Reporting
       target_units_FlowRate = 'm^3/h'
       def_units_powerPerFloorArea = 'W/m^2'
       inst_units_FlowRate = 'm^3/h'
-      target_units_flowperSpaceFloorArea = 'm/h'
+      target_units_flowperSpaceFloorArea = 'm/s'
       inst_units_outdoorAirFlowperPerson = 'm^3/h/person'
       inst_units_flowperSpaceFloorArea = 'm^3/h/ floor area m^2'
       inst_units_flowperExteriorSurfaceArea = 'm^3/h/ext surf area m^2'
@@ -2125,7 +2097,7 @@ module OsLib_Reporting
       zone_name_list = []
       space_name_list = []
       spaceType.spaces.each do |space|
-        # grab space and zone names
+        # grabspace and zone names
         if space.respond_to?(:displayName)
           unless space.displayName.empty?
             space_name_list << space.displayName.get.to_s
@@ -3579,12 +3551,6 @@ module OsLib_Reporting
 
       # space subheading if any equipment found
 
-      if is_ip_units
-        area = space.floorArea.to_f * 10.7639 # --> IP
-      else
-        area = space.floorArea.to_f
-      end
-
       sp_name = space.name.to_s
       if space.respond_to?(:displayName)
         unless space.displayName.empty?
@@ -3592,6 +3558,11 @@ module OsLib_Reporting
         end
       end
 
+      if is_ip_units
+        area = space.floorArea.to_f * 10.7639 # --> IP
+      else
+        area = space.floorArea.to_f
+      end
       if is_ip_units
         table[:data] << [{ sub_header: "Space Name: #{sp_name}, Area: #{area.round(0)} ft^2" }, '', '', '', '', ''] if !space_gas_equip['spacetype'].empty? || !space_gas_equip['space'].empty?
       else
@@ -4907,4 +4878,14 @@ module OsLib_Reporting
 
     return @measure_warnings_section
   end
+
+  # add energyplus summary reports, required for revit systems analysis
+  def self.add_energyplus_reports(runner, html_out)
+    eplustbl_html_path = File.join(runner.workflow.absoluteRunDir.to_s, 'eplustbl.htm')
+    html_to_insert = File.read(eplustbl_html_path).match(/<body>(.*)<\/body>/m)[1]
+    html_to_insert = html_to_insert.gsub(/<table/, "<table class=\"table table-striped table-bordered table-condensed\"")
+    html_out = html_out.gsub(/Measure Warnings<\/a><\/li>/, "Measure Warnings</a></li>\r\n<li><a href=\"#EnergyPlus_Results\">EnergyPlus Results</a></li>")
+    html_out = html_out.gsub(/<\/body>/, "<div class=\"col-md-9 col-md-offset-3\" role=\"main\"><h2 id=\"EnergyPlus_Results\">EnergyPlus Results</h2><br>#{html_to_insert}</div>\\0")
+  end
+
 end

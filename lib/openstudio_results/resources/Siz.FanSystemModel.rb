@@ -3,17 +3,17 @@
 # See also https://openstudio.net/license
 # *******************************************************************************
 
-class OpenStudio::Model::EvaporativeCoolerDirectResearchSpecial
+class OpenStudio::Model::FanSystemModel
   def maxAirFlowRate
-    if primaryAirDesignFlowRate.is_initialized
-      primaryAirDesignFlowRate
+    if designMaximumFlowRate.is_initialized
+      designMaximumFlowRate
     else
-      autosizedPrimaryAirDesignFlowRate
+      autosizedDesignMaximumFlowRate
     end
   end
 
   def maxAirFlowRateAutosized
-    if primaryAirDesignFlowRate.is_initialized
+    if designMaximumFlowRate.is_initialized
       # Not autosized if hard size field value present
       return OpenStudio::OptionalBool.new(false)
     else
@@ -23,7 +23,9 @@ class OpenStudio::Model::EvaporativeCoolerDirectResearchSpecial
 
   def performanceCharacteristics
     effs = []
-    effs << [coolerEffectiveness, 'Cooler Effectiveness']
+    effs << [fanTotalEfficiency, 'Fan Total Efficiency']
+    effs << [designPressureRise, 'Design Pressure Rise']
+    effs << [motorEfficiency, 'Motor Efficiency']
     return effs
   end
 end
