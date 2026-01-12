@@ -1,7 +1,8 @@
 # lbt-measures
 
-:straight_ruler: :straight_ruler: :straight_ruler: Collection of measures that ship with the
-Ladybug Tools plugins.
+:straight_ruler: :straight_ruler: :straight_ruler: Collection of
+[Openstudio measures](https://nrel.github.io/OpenStudio-user-documentation/getting_started/about_measures/)
+that ship with the Ladybug Tools plugins.
 
 Most (if not all) of the measures in this gem can be found on the [BCL](https://bcl.nrel.gov/)
 and are maintained by [NREL](https://www.nrel.gov/) or other contributors. However,
